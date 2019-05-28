@@ -10,6 +10,11 @@ rapl-read:	rapl-read.o
 rapl-read.o:	rapl-read.c
 	$(CC) $(CFLAGS) -c rapl-read.c
 
+raplr:	raplr.o
+	$(CC) -o raplr raplr.o $(LFLAGS) 
+
+raplr.o:	raplr.c
+	$(CC) $(CFLAGS) -c raplr.c $(LFLAGS)
 
 rapl-plot:	rapl-plot.o
 	$(CC) $(LFLAGS) -o rapl-plot rapl-plot.o
@@ -19,7 +24,7 @@ rapl-plot.o:	rapl-plot.c
 
 
 clean:	
-	rm -f *.o *~ rapl-read rapl-plot
+	rm -f *.o *~ rapl-read rapl-plot raplr
 
 install:
 	scp rapl-read.c vweaver@sasquatch.eece.maine.edu:public_html/projects/rapl
