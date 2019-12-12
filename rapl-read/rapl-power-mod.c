@@ -425,8 +425,8 @@ int main(int argc, char**argv)
   unsigned int npower = (unsigned int)(power/0.125);
   
   RAPL_INIT();
+  RAPL_POWER_MOD(0, npower);
   RAPL_POWER_MOD(1, npower);
-  
   
   return 0;
 }

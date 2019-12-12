@@ -4,7 +4,7 @@ LFLAGS =
 
 .PHONY: rapl-power-mod
 
-all:	rapl-read rapl-plot
+all:	rapl-read rapl-plot rapl-power-mod
 
 rapl-power-mod:
 	$(CC) $(LFLAGS) -o rapl-power-mod rapl-power-mod.c -lm
