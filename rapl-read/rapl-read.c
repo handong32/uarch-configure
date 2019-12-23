@@ -354,8 +354,10 @@ static int rapl_msr(int core, int cpu_model) {
 	double dram_before[MAX_PACKAGES],dram_after[MAX_PACKAGES];
 	double psys_before[MAX_PACKAGES],psys_after[MAX_PACKAGES];
 	double thermal_spec_power,minimum_power,maximum_power,time_window;
-	int j;
-
+	double energypkg = 0.0;
+	double energyram = 0.0;
+	int i,j;
+	
 	int dram_avail=0,pp0_avail=0,pp1_avail=0,psys_avail=0;
 	int different_units=0;
 
@@ -539,7 +541,8 @@ static int rapl_msr(int core, int cpu_model) {
 		/* Package Energy */
 		result=read_msr(fd,msr_pkg_energy_status);
 		package_before[j]=(double)result*cpu_energy_units[j];
-
+		printf("\t\tPackage before: %.6fJ\n", package_before[j]);
+		
 		/* PP0 energy */
 		/* Not available on Knights* */
 		/* Always returns zero on Haswell-EP? */
@@ -574,48 +577,61 @@ static int rapl_msr(int core, int cpu_model) {
 		close(fd);
 	}
 
-  	printf("\n\tSleeping 1 second\n\n");
-	sleep(1);
+	
+	while(1) {
+	  //printf("\n\tSleeping 1 second\n\n");
+	  sleep(1);
 
-	for(j=0;j<total_packages;j++) {
+	  energypkg = 0.0;
+	  energyram = 0.0;
+	  for(j=0;j<total_packages;j++) {
 
-		fd=open_msr(package_map[j]);
+	    fd=open_msr(package_map[j]);
 
-		printf("\tPackage %d:\n",j);
+	    //printf("\tPackage %d:\n",j);
 
-		result=read_msr(fd,msr_pkg_energy_status);
-		package_after[j]=(double)result*cpu_energy_units[j];
-		printf("\t\tPackage energy: %.6fJ\n",
-			package_after[j]-package_before[j]);
+	    result=read_msr(fd,msr_pkg_energy_status);
+	    package_after[j]=(double)result*cpu_energy_units[j];
+	    energypkg += (package_after[j]-package_before[j]);
+	    //printf("\t\tPackage %d energy: %.6fJ\n", j, );
+	    package_before[j] = package_after[j];
+	    //printf("\t\tPackage energy: %.6fJ\n", package_after[j]-package_before[j]);
 
-		result=read_msr(fd,msr_pp0_energy_status);
-		pp0_after[j]=(double)result*cpu_energy_units[j];
-		printf("\t\tPowerPlane0 (cores): %.6fJ\n",
-			pp0_after[j]-pp0_before[j]);
+	    if (dram_avail) {
+	      result=read_msr(fd,MSR_DRAM_ENERGY_STATUS);
+	      dram_after[j]=(double)result*dram_energy_units[j];
+	      energyram += dram_after[j]-dram_before[j];
+	      dram_before[j] = dram_after[j];
+	      //printf("\t\tDRAM: %.6fJ\n",
+	      //     dram_after[j]-dram_before[j]);
+	    }
+	    
+	    /*result=read_msr(fd,msr_pp0_energy_status);
+	    pp0_after[j]=(double)result*cpu_energy_units[j];
+	    printf("\t\tPowerPlane0 (cores): %.6fJ\n",
+		   pp0_after[j]-pp0_before[j]);
 
-		/* not available on SandyBridge-EP */
-		if (pp1_avail) {
-			result=read_msr(fd,MSR_PP1_ENERGY_STATUS);
-			pp1_after[j]=(double)result*cpu_energy_units[j];
-			printf("\t\tPowerPlane1 (on-core GPU if avail): %.6f J\n",
-				pp1_after[j]-pp1_before[j]);
-		}
+	    // not available on SandyBridge-EP
+	    if (pp1_avail) {
+	      result=read_msr(fd,MSR_PP1_ENERGY_STATUS);
+	      pp1_after[j]=(double)result*cpu_energy_units[j];
+	      printf("\t\tPowerPlane1 (on-core GPU if avail): %.6f J\n",
+		     pp1_after[j]-pp1_before[j]);
+	    }
 
-		if (dram_avail) {
-			result=read_msr(fd,MSR_DRAM_ENERGY_STATUS);
-			dram_after[j]=(double)result*dram_energy_units[j];
-			printf("\t\tDRAM: %.6fJ\n",
-				dram_after[j]-dram_before[j]);
-		}
+	    
 
-		if (psys_avail) {
-			result=read_msr(fd,MSR_PLATFORM_ENERGY_STATUS);
-			psys_after[j]=(double)result*cpu_energy_units[j];
-			printf("\t\tPSYS: %.6fJ\n",
-				psys_after[j]-psys_before[j]);
-		}
+	    if (psys_avail) {
+	      result=read_msr(fd,MSR_PLATFORM_ENERGY_STATUS);
+	      psys_after[j]=(double)result*cpu_energy_units[j];
+	      printf("\t\tPSYS: %.6fJ\n",
+		     psys_after[j]-psys_before[j]);
+		     }*/
 
-		close(fd);
+	    close(fd);
+	  }
+
+	  printf("\t\t 1s Package energy: %.6fJ dram:%.6fJ\n", energypkg, energyram);
 	}
 	printf("\n");
 	printf("Note: the energy measurements can overflow in 60s or so\n");
@@ -674,7 +690,7 @@ static int rapl_perf(int core) {
 	double scale[NUM_RAPL_DOMAINS];
 	struct perf_event_attr attr;
 	long long value;
-	int i,j;
+	int i,j,t;
 	int paranoid_value;
 
 	printf("\nTrying perf_event interface to gather results\n\n");
@@ -762,25 +778,26 @@ static int rapl_perf(int core) {
 	sleep(1);
 
 	for(j=0;j<total_packages;j++) {
-		printf("\tPackage %d:\n",j);
+	  printf("\tPackage %d:\n",j);
 
-		for(i=0;i<NUM_RAPL_DOMAINS;i++) {
+	  for(i=0;i<NUM_RAPL_DOMAINS;i++) {
 
-			if (fd[i][j]!=-1) {
-				read(fd[i][j],&value,8);
-				close(fd[i][j]);
+	    if (fd[i][j]!=-1) {
+	      read(fd[i][j],&value,8);
+	      close(fd[i][j]);
 
-				printf("\t\t%s Energy Consumed: %lf %s\n",
-					rapl_domain_names[i],
-					(double)value*scale[i],
-					units[i]);
+	      printf("\t\t%s Energy Consumed: %lf %s\n",
+		     rapl_domain_names[i],
+		     (double)value*scale[i],
+		     units[i]);
 
-			}
+	    }
 
-		}
+	  }
 
 	}
 	printf("\n");
+	
 
 	return 0;
 }
