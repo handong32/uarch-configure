@@ -417,8 +417,8 @@ int main(int argc, char**argv)
   }
 
   int power = atoi(argv[1]);
-  if (power < 35 || power > 215) {
-    printf("Power spec 35 - 215 Watts\n");
+  if (power < 10 || power > 215) {
+    printf("Power spec 10 - 215 Watts\n");
     return 0;
   }
   
